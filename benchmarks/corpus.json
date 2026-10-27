@@ -1,0 +1,97 @@
+{
+  "version": 1,
+  "split": "development",
+  "purpose": "Initial diagnostic corpus; not held-out evidence of superiority.",
+  "cases": [
+    {
+      "id": "C001",
+      "source_dir": "cases/C001",
+      "file": "main.cpp",
+      "function": "inspect",
+      "sink_line": 3,
+      "expected": "CONFIRMED",
+      "rationale": "A local null pointer reaches the unconditional dereference without a write or guard."
+    },
+    {
+      "id": "C002",
+      "source_dir": "cases/C002",
+      "file": "main.cpp",
+      "function": "inspect",
+      "sink_line": 4,
+      "expected": "REJECTED",
+      "rationale": "The early return prevents the null local from reaching the dereference."
+    },
+    {
+      "id": "C003",
+      "source_dir": "cases/C003",
+      "file": "main.cpp",
+      "function": "inspect",
+      "sink_line": 4,
+      "expected": "CONFIRMED",
+      "rationale": "The available callee unconditionally returns null and the caller directly dereferences it."
+    },
+    {
+      "id": "C004",
+      "source_dir": "cases/C004",
+      "file": "main.cpp",
+      "function": "inspect",
+      "sink_line": 4,
+      "expected": "REJECTED",
+      "rationale": "The callee returns the address of a live static object; no nullable alternative exists in this fixture."
+    },
+    {
+      "id": "C005",
+      "source_dir": "cases/C005",
+      "file": "main.cpp",
+      "function": "inspect",
+      "sink_line": 5,
+      "expected": "CONFIRMED",
+      "rationale": "Reassigning p does not change the null value previously copied to q."
+    },
+    {
+      "id": "C006",
+      "source_dir": "cases/C006",
+      "file": "main.cpp",
+      "function": "inspect",
+      "sink_line": 5,
+      "expected": "REJECTED",
+      "rationale": "The dereferenced pointer is reassigned to a live local before use."
+    },
+    {
+      "id": "C007",
+      "source_dir": "cases/C007",
+      "file": "main.cpp",
+      "function": "inspect",
+      "sink_line": 3,
+      "expected": "REJECTED",
+      "rationale": "Built-in logical AND short circuits, so the null pointer is not dereferenced."
+    },
+    {
+      "id": "C008",
+      "source_dir": "cases/C008",
+      "file": "main.cpp",
+      "function": "inspect",
+      "sink_line": 4,
+      "expected": "UNKNOWN",
+      "rationale": "The external return contract is absent; neither nullability nor non-nullness is established."
+    },
+    {
+      "id": "C009",
+      "source_dir": "cases/C009",
+      "file": "main.cpp",
+      "function": "inspect",
+      "sink_line": 6,
+      "expected": "CONFIRMED",
+      "rationale": "The assignment after the guard invalidates that guard for the later null dereference."
+    },
+    {
+      "id": "C010",
+      "source_dir": "cases/C010",
+      "file": "main.cpp",
+      "function": "inspect",
+      "sink_line": 3,
+      "expected": "REJECTED",
+      "rationale": "The expression invokes a defined member operator on a live object, not a raw-pointer dereference."
+    }
+  ]
+}

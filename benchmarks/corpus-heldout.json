@@ -1,0 +1,142 @@
+{
+  "version": 1,
+  "split": "held-out",
+  "purpose": "Frozen held-out corpus; labels and rationales fixed before any evaluation run. Not for rule tuning.",
+  "cases": [
+    {
+      "id": "H001",
+      "source_dir": "heldout/H001",
+      "file": "main.cpp",
+      "function": "inspect",
+      "sink_line": 4,
+      "expected": "CONFIRMED",
+      "rationale": "The cross-TU callee returns null on the mode > 0 branch and the caller passes the constant 1, then dereferences unconditionally."
+    },
+    {
+      "id": "H002",
+      "source_dir": "heldout/H002",
+      "file": "main.cpp",
+      "function": "inspect",
+      "sink_line": 5,
+      "expected": "REJECTED",
+      "rationale": "The null check is delegated to a callee in another translation unit; its early return covers the dereference."
+    },
+    {
+      "id": "H003",
+      "source_dir": "heldout/H003",
+      "file": "main.cpp",
+      "function": "inspect",
+      "sink_line": 4,
+      "expected": "REJECTED",
+      "rationale": "The header-inline wrapper substitutes a live static fallback for a null argument, so its return value cannot be null."
+    },
+    {
+      "id": "H004",
+      "source_dir": "heldout/H004",
+      "file": "main.cpp",
+      "function": "inspect",
+      "sink_line": 5,
+      "expected": "CONFIRMED",
+      "rationale": "The callee exposes a file-static pointer initialized to null; the caller copies it into an alias and dereferences the alias."
+    },
+    {
+      "id": "H005",
+      "source_dir": "heldout/H005",
+      "file": "main.cpp",
+      "function": "inspect",
+      "sink_line": 4,
+      "expected": "UNKNOWN",
+      "rationale": "Only a header declaration of the callee exists; no definition or stub is present, so its return contract is a missing fact."
+    },
+    {
+      "id": "H006",
+      "source_dir": "heldout/H006",
+      "file": "main.cpp",
+      "function": "inspect",
+      "sink_line": 5,
+      "expected": "CONFIRMED",
+      "rationale": "The cross-TU container is initialized with a null first element and the caller dereferences front() unconditionally."
+    },
+    {
+      "id": "H007",
+      "source_dir": "heldout/H007",
+      "file": "main.cpp",
+      "function": "inspect",
+      "sink_line": 4,
+      "expected": "UNKNOWN",
+      "rationale": "The only callee definition is masked behind an undefined build macro; whether any definition is linked is a compile-time fact absent from the sources."
+    },
+    {
+      "id": "H008",
+      "source_dir": "heldout/H008",
+      "file": "main.cpp",
+      "function": "inspect",
+      "sink_line": 6,
+      "expected": "CONFIRMED",
+      "rationale": "Both guards cover only the mode > 0 paths; on mode <= 0 the null local falls through to the dereference."
+    },
+    {
+      "id": "H009",
+      "source_dir": "heldout/H009",
+      "file": "main.cpp",
+      "function": "inspect",
+      "sink_line": 11,
+      "expected": "CONFIRMED",
+      "rationale": "On the kind == 0 path the function pointer selects the null-returning producer and the result is dereferenced unconditionally."
+    },
+    {
+      "id": "H010",
+      "source_dir": "heldout/H010",
+      "file": "main.cpp",
+      "function": "inspect",
+      "sink_line": 5,
+      "expected": "REJECTED",
+      "rationale": "The conditional assignment can yield null, but the following guard repairs that branch with a live fallback before the dereference."
+    },
+    {
+      "id": "H011",
+      "source_dir": "heldout/H011",
+      "file": "main.cpp",
+      "function": "inspect",
+      "sink_line": 5,
+      "expected": "CONFIRMED",
+      "rationale": "A default-constructed unique_ptr holds null; get() therefore yields null and it is dereferenced without a guard."
+    },
+    {
+      "id": "H012",
+      "source_dir": "heldout/H012",
+      "file": "main.cpp",
+      "function": "inspect",
+      "sink_line": 4,
+      "expected": "UNKNOWN",
+      "rationale": "The dereference hides inside a macro whose operand is an extern callee with no provided definition; the return contract is a missing fact."
+    },
+    {
+      "id": "H013",
+      "source_dir": "heldout/H013",
+      "file": "main.cpp",
+      "function": "inspect",
+      "sink_line": 5,
+      "expected": "UNKNOWN",
+      "rationale": "The callback pointer is defined in a translation unit that is not provided; neither its target nor the target's return contract is known."
+    },
+    {
+      "id": "H014",
+      "source_dir": "heldout/H014",
+      "file": "node.cpp",
+      "function": "crnti_for_imsi",
+      "sink_line": 18,
+      "expected": "REJECTED",
+      "rationale": "Real project (AetherStack @ ed126a8): stack/core/src/bs_node.cpp crnti_for_imsi guards the nullable result of stack/nas/src/nas_bs.cpp find_ue_by_imsi with an early return before ctx->tmsi; manual line-by-line read confirmed guard coverage."
+    },
+    {
+      "id": "H015",
+      "source_dir": "heldout/H015",
+      "file": "ue.cpp",
+      "function": "end_call",
+      "sink_line": 34,
+      "expected": "REJECTED",
+      "rationale": "Real project (AetherStack @ ed126a8): stack/core/src/ue_node.cpp end_call chains a null literal and two nullable find_dialog_by_kind fallbacks, then dereferences only under a final d != nullptr guard; manual line-by-line read confirmed guard coverage."
+    }
+  ]
+}
