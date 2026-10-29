@@ -43,6 +43,53 @@ Claude SDK 的主要接入点是 `security_agent/infra/claude.py`：在函数内
 `mcp__security__*` 工具，并显式设置 `skills=[]`、`plugins=[]`、`setting_sources=[]`。
 SDK 调用失败统一形成失败执行结果，再按流程保留为 UNKNOWN，不能转成“无漏洞”。
 
+### 2.1 两层 Runtime 的实际位置
+
+本仓没有一个单独命名为 `AgentRuntime` 的类或进程。需要区分两层：
+
+**通用 Agent Runtime 位于外部 Claude Agent SDK。** 模型推理、Tool calling 和多轮消息循环由
+`claude-agent-sdk` 提供，源码不在本仓。本仓通过 `security_agent/infra/claude.py` 配置
+`ClaudeAgentOptions`、创建 `ClaudeSDKClient`、发送查询并接收消息流：
+
+```text
+ClaudeSDKClient
+  → 模型推理
+  → 请求 MCP 工具
+  → 工具返回
+  → 模型继续推理
+  → 结构化结果
+```
+
+**Security Runtime 主要由本仓 `pipeline/` 与 `core/` 共同承担。** 最集中的调度入口是
+`security_agent/pipeline/controller.py`，而不是某个 SDK 类型：
+
+| 位置 | 职责 |
+| --- | --- |
+| `pipeline/controller.py` 的 `run()` | 整个调查运行主循环、单写者锁、阶段推进与最终导出 |
+| `pipeline/controller.py` 的 `advance()` | Investigator → Judge → follow-up → 下一轮 |
+| `pipeline/controller.py` 的 `invoke()` | 预算检查、Action/Attempt 创建、后端调用、结果与回执落盘 |
+| `pipeline/controller.py` 的 `recover()` | 恢复中断 Attempt，优先消费已有持久化结果 |
+| `core/runtime.py` 的 `project()` / `refresh()` | 从历史产物重建 Hypothesis、Evidence、Decision、Finding |
+| `core/runtime.py` 的 `followups()` | 校验 Judge 补查请求及冻结源码范围 |
+| `core/judge.py` | 证据接纳、裁决与 Finding 门禁 |
+| `core/storage.py` | 原子写入、文件锁、哈希密封与校验 |
+
+`core/executor.py` 的 `AgentExecutor` 只是后端执行端口，不是 Runtime 实现。
+完整调用链为：
+
+```text
+security_agent/cli.py
+  → pipeline/controller.py: run()
+  → pipeline/controller.py: advance()
+  → pipeline/controller.py: invoke()
+  → core/executor.py: AgentExecutor 接口
+  → infra/claude.py: ClaudeExecutor
+  → Claude Agent SDK 的通用 Agent Runtime
+```
+
+因此，定位本项目的调查调度中枢应先看 `pipeline/controller.py`；定位模型与工具内层循环的接入点
+应看 `infra/claude.py`，其通用实现由 SDK 提供。
+
 ## 3. SDK 能力的复用与取舍
 
 | 能力 | 当前使用情况 | 原因与边界 |
