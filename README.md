@@ -54,6 +54,7 @@ CONFIRMED 需要 origin/sink/path 三类证据齐全；模型调用先落盘再�
 - [docs/validation.md](docs/validation.md)：全部实验流水账（从下往上读是最新结果）。
 - [docs/multi-dim-eval.md](docs/multi-dim-eval.md)：可用性/可扩展性/健壮性/安全性/成本多维评估。
 - [docs/trace-eval.md](docs/trace-eval.md)：trace/eval 追溯机制；[docs/tools-and-skills.md](docs/tools-and-skills.md)、[docs/agent-backends.md](docs/agent-backends.md)：工具层与执行后端。
+- [docs/skill-repository-injection.md](docs/skill-repository-injection.md)：Agent 能力复用、Skill 场景仓与动态注入候选设计（未实现）。
 - `benchmarks/`：考题库（`cases/` 开发集、`heldout/` 冻结保留集、`HELDOUT.md` 冻结记录）；`.runs/`：全部实验现场。
 
 ## 安装与运行
