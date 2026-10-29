@@ -138,19 +138,91 @@ Skill 作者可以不关心宿主，但宿主必须对 Skill 声明的能力有�
 - Judge 不加载场景包，不接收 Investigator 的隐含会话状态。
 - Skill 只影响调查建议，不能修改预算、基线、UNKNOWN 约定或 STALE 规则。
 
-## 8. 推荐落地顺序
+## 8. 其他 SDK 能力的复用边界
 
-1. **固定集合注入**：支持显式选择 Skill、完整哈希绑定、Investigator 单角色注入和恢复校验。
-2. **便携能力声明**：定义通用/安全 Skill 的能力与可选精度扩展，验证不支持时的明确失败或降级。
-3. **运行中追加**：增加追加式事件、集合版本和历史重放，再开放用户显式动态注入。
-4. **真实验证**：覆盖原生宿主复用、坏 Skill、哈希变化、中断恢复、Judge 隔离、预算和零 Finding 边界。
+总原则是：继续复用 SDK 的通用执行工作面，但安全结论依赖的状态、证据和有效性判断仍由 Runtime 持有。
+不能以增加复用为名，一次性开放所有原生能力。
 
-第一版改动面集中在 CLI、`Task`/运行配置、Core 的 Skill 加载器和 Claude 适配器。
-正式实现前需要核对当前锁定版 `claude-agent-sdk` 的 `skills` 参数类型与加载语义；
-本讨论没有验证该 API 的具体字段形态，不能据此假定可直接传路径列表。
+### 8.1 优先复用的执行设施
 
-## 9. 当前决策
+| 能力 | 建议 | 价值与条件 |
+| --- | --- | --- |
+| Hooks / 权限拦截 | 复用为执行层防线 | 统一记录和拒绝工具、Subagent 行为；不能代替 Core 的预算、证据和状态校验 |
+| 原生 Read / Glob / Grep | 有限开放 | 提高通用 Skill 兼容性；只能指向只读冻结 checkout，不能读取实时工作区 |
+| Subagent | 用于有界、只读调查 worker | 适合并行查调用者、返回分支和 guard；必须记录完整消息、工具调用、费用和父 attempt |
+| MCP 工具体系 | 继续作为跨宿主契约 | 七类查询由 Core 执行，各后端只做协议适配，避免重复实现工具逻辑 |
+| 结构化输出 | 直接复用 | SDK JSON Schema 负责输出形态，Core 继续负责业务校验 |
+| 消息流、取消、资源清理 | 直接复用 | 不重建传输和异步生命周期 |
+| Token / 费用等用量信息 | 复用上报告数据 | 只作为宿主报告的用量；供应商未准确上报时记 null，不能视为最终账单 |
 
-采用“**复用 SDK 通用能力 + Security Runtime 保留业务控制 + 独立 Skill 场景仓显式注入**”。
+基线宿主已有 Hooks 和 Subagent 的实际示例：`security_agent/validation/baseline_host.py` 中的
+`AgentDefinition`、`HookMatcher`、`PreToolUse` 和 `SubagentStart`。
+主 Runtime 若开放这些能力，可以复用其执行机制，但不能照搬基线的策略或放宽主流程约束。
+若 Subagent 无法完整落盘并归属预算，则继续使用独立 SDK 会话，不能留下隐藏执行面。
+
+### 8.2 原生文件工具与正式取证分开
+
+当前主 Claude 适配器设置 `tools=[]`，并使用空临时目录作为 `cwd`。这保证了隔离，
+但使“用 Grep 找调用点、用 Read 看上下文”这类通用 Skill 无法直接运行。
+
+建议形成两个工具平面：
+
+- **调查工作面**：原生 `Read/Glob/Grep` 只读冻结 checkout，供通用 Skill 和 Agent 发现线索。
+- **正式取证面**：继续使用 Runtime 的 `read_source/search_source` 和七类语义查询，
+  保存原始响应、依赖哈希、结果精度及字节预算。
+
+模型可以经原生工具发现线索，但正式 Evidence 仍须通过受控取证工具重新引用冻结字节。
+原生工具返回的文本不能绕过证据门禁直接升级为 Finding。默认仍不开放 Write/Edit/Bash。
+
+### 8.3 可以复用但不能作为权威状态
+
+**Memory / Session Resume**
+
+同一 attempt 内的对话上下文已经由 SDK 管理，无需重建。跨 attempt、角色和后端时：
+
+- 会话恢复可以作为减少重复上下文传输的优化；不能作为 run 的恢复依据。
+- 长期记忆最多提供调查线索，不能直接成为 Evidence 或 Finding。
+- 权威状态仍是 `state.json`、Action/Attempt、EvidenceSet 和 JudgeDecision。
+
+**Plan / Todo 类能力**
+
+可以展示模型短期工作计划，但不能替代 Hypothesis、MissingFact、Action/Attempt、
+调查轮次、无进展停止和 Judge follow-up。计划工具中的“完成”不等于安全调查契约完成。
+
+**Plugins / Slash Commands**
+
+Slash Commands 适合作为用户操作入口，Plugin 适合作为 Skill、MCP、Hooks 的分发形式。
+不应直接继承本机插件配置；进入 run 的内容必须显式选择、完整哈希并冻结版本。
+
+当前只白名单读取 provider 连接配置的选择保持不变：认证可以复用，
+用户机器上的 Hooks、权限和插件不能隐式进入 run。模型路由和故障切换也不能静默改变已冻结模型。
+
+### 8.4 不应交给 SDK 替代的业务控制
+
+1. **Git 基线与冻结快照**：原生 Read 默认读取工作区，不能证明证据属于哪个 commit/blob。
+2. **证据门禁与 Finding 生成**：`admit()`、origin/sink/path、行号和真实字节校验不能由提示词或 Hook 替代。
+3. **Judge 隔离与 UNKNOWN 语义**：SDK 可以创建独立会话，但允许输入和失败语义由 Runtime 决定。
+4. **预算账本、检查点和恢复**：SDK 美元限制不能替代分层预算、预留不退还和结果重放。
+5. **哈希密封与 STALE 传播**：基线、规则、Skill 或工具变化后的旧结论撤下属于业务有效性机制。
+6. **代码事实精度归一化**：`text-candidate` 不能升级为符号引用，`candidate-relation` 不能升级为确定数据流。
+7. **评估、trace、SARIF 与报告重建**：SDK 消息流是原始输入，不是完整安全评估账本。
+
+## 9. 推荐落地顺序
+
+1. **只读原生文件工具 + Hooks**：在冻结 checkout 上提供通用调查工作面，正式取证仍走 Core。
+2. **固定集合注入**：支持显式选择 Skill、完整哈希绑定、Investigator 单角色注入和恢复校验。
+3. **便携能力声明**：定义通用/安全 Skill 的能力与可选精度扩展，验证不支持时的明确失败或降级。
+4. **有界只读 Subagent**：确认完整落盘、父 attempt 关联和预算归属后再开放。
+5. **会话/记忆优化**：只作缓存或上下文传输优化，不改变恢复语义。
+6. **运行中追加 Skill**：增加追加式事件、集合版本和历史重放，再开放用户显式动态注入。
+7. **真实验证**：覆盖原生宿主复用、坏 Skill、哈希变化、中断恢复、Judge 隔离、预算和零 Finding 边界。
+
+第一阶段改动面集中在 CLI、`Task`/运行配置、Core 的 Skill 加载器、Claude 适配器和只读工作区配置。
+正式实现前需要核对当前锁定版 `claude-agent-sdk` 的 `skills` 参数类型、原生工具路径约束与 Hook 事件语义；
+本讨论没有验证这些 API 的具体字段形态，不能据此假定可直接传路径列表或所有后端具有相同能力。
+
+## 10. 当前决策
+
+采用“**SDK 负责通用 Agent 工作面，Tools 负责可信代码事实，Security Runtime 负责业务状态与结论有效性**”。
 不以重建 Subagent、Tool calling、Memory 或 Skills 为目标，也不以牺牲可恢复性、证据门禁和 Judge 隔离为代价换取自动发现。
-先完成创建时固定集合注入，再根据实际场景决定是否开放运行中追加。
+优先提供只读原生工作面和创建时固定 Skill 集合注入，再按实际场景逐步开放 Subagent、记忆优化与运行中追加。
